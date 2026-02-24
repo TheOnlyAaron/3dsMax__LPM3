@@ -568,14 +568,6 @@ struct LPM_RenderAPI
 					)
 					-- TODO: soring and restoring vray sun lights is causing errors, disabling override for them for now
 					-- VraySun objects do not have all the same properties as a standard vray light
-					if ( classof(it) == VRaySun ) then
-					(
-						-- print("Storing Vray Sun")
-						-- tmp[6]=it.baseObject.affect_diffuse  		
-						-- tmp[7]=it.baseObject.affect_specular 		
-						-- tmp[19]=it.baseObject.color_mode
-						-- tmp[22]=it.baseObject.invisible		
-					)
 					if (classof(it) != VRayLight) and (classof(it) != VRaySun) then
 					(
 						try( tmp[4]=it.color 						)catch(print" problem storting light ")
@@ -1146,21 +1138,13 @@ struct LPM_RenderAPI
 					
 					-- Added handling for vray sun nodes
 					-- TODO: soring and restoring vray sun lights is causing errors, disabling override for them for now
-					else if ( classof(theNode) == VRaySun ) then
-					(
-						-- print("Restoring Vray Sun")
-						-- it.baseObject.affect_diffuse  			= tmp[6]
-						-- it.baseObject.affect_specular 			= tmp[7]
-						-- it.baseObject.color_mode 				= tmp[19]
-						-- it.baseObject.invisible		 			= tmp[22]
-					)
 					if (classof(it) != VRayLight) and (classof(it) != VRaySun) then
 					(
-						try( theNode.color=it[4]    					)catch()--print" problem restorting light ")
-						try( theNode.baseObject.projectorMap=it[16]    	)catch()--print" problem restorting light ")
-						try( theNode.baseObject.projector=it[17]    	)catch()--print" problem restorting light ")
-						try( theNode.baseObject.affectDiffuse=it[14]   	)catch()--print" problem restorting light ")
-						try( theNode.baseObject.affectSpecular=it[15]   )catch()--print" problem restorting light ")
+						try( theNode.color=it[4]    					)catch()
+						try( theNode.baseObject.projectorMap=it[16]    	)catch()
+						try( theNode.baseObject.projector=it[17]    	)catch()
+						try( theNode.baseObject.affectDiffuse=it[14]   	)catch()
+						try( theNode.baseObject.affectSpecular=it[15]   )catch()
 					)
 					-- Default paramaters
 				)
@@ -1400,8 +1384,6 @@ fn LPM_renderPass thePass renderType theShot:undefined=
 		(
 			rendOutputFilename 	= LPM_Fun.getPreviewFile thePass
 
-			print( "================================== rendOutputFilename === " + rendOutputFilename)
-
 			makeDir ((getDir #preview)+"\\"+maxFileName+"_"+"\\") all:true
 			deleteFile rendOutputFilename
 			rendTimeType=1
@@ -1409,14 +1391,8 @@ fn LPM_renderPass thePass renderType theShot:undefined=
 
 			if(renderType==#previewHalf) then
 			(
-				-- print ( "------------- RENDER PREVIEW 50% CHUNK " )
-				-- print ( "----- LPM_Root.previewSize - " + LPM_Root.previewSize as string )
-
 				renderHeight 	=(renderHeight 	* (LPM_Root.previewSize as float) / 100.0)
 				renderWidth 	=(renderWidth 	* (LPM_Root.previewSize as float) / 100.0)
-
-				-- print ( "----- renderHeight - " + renderHeight as string )
-				-- print ( "----- renderWidth - " + renderWidth as string )
 			)
 		)
 
