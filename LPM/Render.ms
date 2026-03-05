@@ -252,63 +252,45 @@ struct LPM_RenderAPI
 				)
 				catch()
 
-				try
+				-- VRay-specific light properties -- only attempted when VRay is installed.
+				-- Previously these were individual try/catch blocks that silently swallowed
+				-- failures on non-VRay systems. Now gated by an explicit global check.
+				if LPM_VRayInstalled then
 				(
 					case lightSetArray[i].pAffectDiffuse of
 					(
 						2:(it.baseObject.affect_diffuse = true)
 						3:(it.baseObject.affect_diffuse = false)
 					)
-				)
-				catch()
 
-				try
-				(
 					case lightSetArray[i].pAffectSpecular of
 					(
-						2:(it.baseObject.affect_specualr = true)
-						3:(it.baseObject.affect_specualr = false)
+						2:(it.baseObject.affect_specular = true)
+						3:(it.baseObject.affect_specular = false)
 					)
-				)
-				catch()
 
-				try
-				(
 					case lightSetArray[i].pAffectReflections of
 					(
 						2:(it.baseObject.affect_reflections = true)
 						3:(it.baseObject.affect_reflections = false)
 					)
-				)
-				catch()
 
-				try
-				(
 					case lightSetArray[i].pUseTexture of
 					(
 						2:(it.baseObject.texmap_on = true)
 						3:(it.baseObject.texmap_on = false)
 					)
-				)
-				catch()
 
-
-				-- TODO: This is where the V-Ray Light is being modified, needs to be restored
-				try
-				(
+					-- TODO: This is where the V-Ray Light is being modified, needs to be restored
 					case lightSetArray[i].pVrayInvisible of
 					(
 						2:(it.baseObject.invisible = true)
 						3:(it.baseObject.invisible = false)
 					)
-				)
-				catch()
 
-				try
-				(
-					if lightSetArray[i].pTextureEnable then(it.baseObject.texmap=lightSetArray[i].pTexture)
+					if lightSetArray[i].pTextureEnable then
+						it.baseObject.texmap = lightSetArray[i].pTexture
 				)
-				catch()
 
 
 				---------    default part
@@ -540,18 +522,43 @@ struct LPM_RenderAPI
 				-- backup lightset properties
 				lightBackup=for it in objects where ((superclassof it)==light) collect
 				(
-					propNames = getPropNames it
-					propDict = Dictionary #name
-					propDict[#object] = it
+					tmp=#(it)
 
-					for i=1 to propNames.count do (
-						propName = propNames[i]
-						propDict[propName] = getProperty it propName
+					-- Need to populate this array out with information to have properties for the correct indecies
+					for i=2 to 22 do(tmp[i] = undefined)
+
+					-- Default paramaters
+					tmp[2]=it.on
+--					tmp[5]=it.baseObject.castShadows
+--					tmp[14]=it.baseObject.affectDiffuse
+--					tmp[15]=it.baseObject.affectSpecular
+					tmp[20]=it.isHidden
+					tmp[21]=it.enabled
+					
+					-- Attempt to modify lights based on engine
+					if LPM_VRayInstalled and ( classof(it) == VRayLight ) then
+					(
+						tmp[3]=it.baseObject.multiplier
+						tmp[6]=it.baseObject.affect_diffuse  		
+						tmp[7]=it.baseObject.affect_specular 		
+						tmp[8]=it.baseObject.affect_reflections  	
+						tmp[9]=it.baseObject.texmap  				
+						tmp[18]=it.baseObject.texmap_on 			
+						tmp[13]=it.baseObject.castShadows 			
+						tmp[19]=it.baseObject.color_mode
+						tmp[22]=it.baseObject.invisible						
+					)
+					-- TODO: soring and restoring vray sun lights is causing errors, disabling override for them for now
+					-- VraySun objects do not have all the same properties as a standard vray light
+					if (not LPM_VRayInstalled) or ((classof(it) != VRayLight) and (classof(it) != VRaySun)) then
+					(
+						try( tmp[4]=it.color 						)catch(print" problem storting light ")
+						try( tmp[16]=it.baseObject.projectorMap 	)catch(print" problem storting light ")
+						try( tmp[17]=it.baseObject.projector 		)catch(print" problem storting light ")
 					)
 
-					propDict
+					tmp
 				)
-
 
 				if(thePass.hideMode>1) then
 				(
@@ -612,7 +619,7 @@ struct LPM_RenderAPI
 						setProp it #primaryVisibility objSetArray[i].intP[4]
 
 						-- Special handling around vrayGausians
-						if classof it == VRayGaussiansGeom then(
+						if LPM_VRayInstalled and classof it == VRayGaussiansGeom then(
 							
 							if objSetArray[i].intP[4] == 1 then()
 							if objSetArray[i].intP[4] == 2 then(it.affect_camera = on )
@@ -1065,7 +1072,7 @@ struct LPM_RenderAPI
 					theNode.primaryVisibility=it[5]
 
 					-- Special handling around vrayGausians
-					if ( classof theNode ) == VRayGaussiansGeom then(
+					if LPM_VRayInstalled and ( classof theNode ) == VRayGaussiansGeom then(
 						if theNode.primaryVisibility == true then(theNode.affect_camera = on )
 						if theNode.primaryVisibility == false then(theNode.affect_camera = off )
 					)
@@ -1093,20 +1100,35 @@ struct LPM_RenderAPI
 				--restore light sets
 				for it in lightBackup do
 				(
-					theNode=it[#object]
-					format "Node: %\n" theNode
-					propNames = getPropNames theNode
-					for i=1 to propNames.count do (
-						propName = propNames[i]
-						try (
-							setProperty theNode propName it[propName]
-						) catch (
-							print(getCurrentException())
+					theNode=it[1]
+					theNode.on=it[2]
+					theNode.isHidden = it[20]
+					theNode.enabled = it[21]
+					-- theNode.baseObject.castShadows=it[5]
 
-						)
-						format "Property: %, Value: %\n" propName (getProperty theNode propName)
+					-- Attempt to modify lights based on engine
+					if LPM_VRayInstalled and ( classof(theNode) == VRayLight ) then
+					(
+						theNode.baseObject.multiplier=it[3]
+						theNode.baseObject.affect_diffuse=it[6]
+						theNode.baseObject.affect_specular=it[7]
+						theNode.baseObject.affect_reflections=it[8]
+						theNode.baseObject.texmap=it[9]
+						theNode.baseObject.texmap_on=it[18]
+						theNode.baseObject.invisible=it[22]
 					)
-
+					
+					-- Added handling for vray sun nodes
+					-- TODO: soring and restoring vray sun lights is causing errors, disabling override for them for now
+					if (not LPM_VRayInstalled) or ((classof(it) != VRayLight) and (classof(it) != VRaySun)) then
+					(
+						try( theNode.color=it[4]    					)catch()
+						try( theNode.baseObject.projectorMap=it[16]    	)catch()
+						try( theNode.baseObject.projector=it[17]    	)catch()
+						try( theNode.baseObject.affectDiffuse=it[14]   	)catch()
+						try( theNode.baseObject.affectSpecular=it[15]   )catch()
+					)
+					-- Default paramaters
 				)
 
 				--Generic Nodes
@@ -1344,8 +1366,6 @@ fn LPM_renderPass thePass renderType theShot:undefined=
 		(
 			rendOutputFilename 	= LPM_Fun.getPreviewFile thePass
 
-			print( "================================== rendOutputFilename === " + rendOutputFilename)
-
 			makeDir ((getDir #preview)+"\\"+maxFileName+"_"+"\\") all:true
 			deleteFile rendOutputFilename
 			rendTimeType=1
@@ -1353,14 +1373,8 @@ fn LPM_renderPass thePass renderType theShot:undefined=
 
 			if(renderType==#previewHalf) then
 			(
-				-- print ( "------------- RENDER PREVIEW 50% CHUNK " )
-				-- print ( "----- LPM_Root.previewSize - " + LPM_Root.previewSize as string )
-
 				renderHeight 	=(renderHeight 	* (LPM_Root.previewSize as float) / 100.0)
 				renderWidth 	=(renderWidth 	* (LPM_Root.previewSize as float) / 100.0)
-
-				-- print ( "----- renderHeight - " + renderHeight as string )
-				-- print ( "----- renderWidth - " + renderWidth as string )
 			)
 		)
 
